@@ -22,7 +22,7 @@ fn main() {
 fn get_repos() {
     let cwd_s : String = get_cwd().unwrap().into_os_string().into_string().unwrap(); 
     println!("{}", cwd_s);
-    let output : Output = Command::new("find").arg(cwd_s)
+    let output : Output = Command::new("find").arg(".")
         .arg("-name .git")
         .arg("-type d")
         .stdout(Stdio::piped())
