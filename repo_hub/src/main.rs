@@ -24,12 +24,13 @@ fn get_repos(path : PathBuf) -> Vec<String> {
         .args([&dir,"-name", ".git","-type", "d"])
         .stdout(Stdio::piped())
         .output().expect("Error!");
-    let repo_results : String = String::from_utf8_lossy(&output.stdout).to_string();
+    let repo_results : String = String::from_utf8_lossy(&output.stdout).to_string()
+        .replace("/.git", "");
     let repo_list : Vec<String> = repo_results.lines().map(String::from).to_vec();     
     //repo_list.iter().filter();
     repo_list
 }
 
 fn get_cwd() -> PathBuf{
-    return env::current_dir().unwrap();
+    env::current_dir().unwrap()
 }
