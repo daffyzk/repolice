@@ -1,7 +1,8 @@
 use std::env;
 use std::path::PathBuf;
-use std::io::Result;
 use std::process::{Stdio, Command, Output};
+use to_vec::ToVec;
+//use regex::Regex;
 
 fn main() {
 
@@ -14,26 +15,21 @@ fn main() {
         3 => println!("too many args!"),
         _ => println!("todo"),
     }
-    
-    println!("this is the cwd: {}", get_cwd().expect("REASON").display());
-    get_repos();
+    println!("{:?}", get_repos(get_cwd()));
 }
 
-fn get_repos() {
-    let cwd_s : String = get_cwd().unwrap().into_os_string().into_string().unwrap();
+fn get_repos(path : PathBuf) -> Vec<String> {
+    let dir : String = path.into_os_string().into_string().unwrap();
     let output : Output = Command::new("find")
-        .args([&cwd_s,"-name", ".git","-type", "d"])
+        .args([&dir,"-name", ".git","-type", "d"])
         .stdout(Stdio::piped())
         .output().expect("Error!");
     let repo_results : String = String::from_utf8_lossy(&output.stdout).to_string();
-    let repo_list : Vec<&str> = repo_results.lines().collect();
+    let repo_list : Vec<String> = repo_results.lines().map(String::from).to_vec();     
     //repo_list.iter().filter();
-    println!("----list of repositories----");
-    println!("{:?}", repo_list);
-    
-
+    repo_list
 }
 
-fn get_cwd() -> Result<PathBuf>{
-    return env::current_dir();
+fn get_cwd() -> PathBuf{
+    return env::current_dir().unwrap();
 }
