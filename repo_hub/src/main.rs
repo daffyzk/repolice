@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 use std::io::Result;
-use std::process::{Command, Output};
+use std::process::{Stdio, Command, Output};
 
 fn main() {
 
@@ -25,8 +25,9 @@ fn get_repos() {
     let output : Output = Command::new("find").arg(cwd_s)
         .arg("-name .git")
         .arg("-type d")
+        .stdout(Stdio::piped())
         .output().expect("Error!");
-    let repo_dirs : String = String::from_utf8(output.stdout).unwrap();
+    let repo_dirs : String = String::from_utf8_lossy(&output.stdout).to_string();
     let repo_list : Vec<&str> = repo_dirs.lines().collect();
     println!("{:?}", repo_dirs);
     println!("----list of repositories----");
