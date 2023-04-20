@@ -2,7 +2,6 @@ use std::env;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use to_vec::ToVec;
-//use regex::Regex;
 
 fn main() {
 
@@ -15,7 +14,13 @@ fn main() {
         3 => println!("too many args!"),
         _ => println!("todo"),
     }
-    println!("{:?}", get_repos(get_cwd()));
+    println!("{:?}", get_status(get_repos(get_cwd())));
+}
+
+fn get_status(repos : Vec<String>){
+    for path in repos{
+        println!("{}", &path);
+    }
 }
 
 fn get_repos(path : PathBuf) -> Vec<String> {
@@ -27,7 +32,7 @@ fn get_repos(path : PathBuf) -> Vec<String> {
     let repo_results : String = String::from_utf8_lossy(&output.stdout).to_string()
         .replace("/.git", "");
     let repo_list : Vec<String> = repo_results.lines().map(String::from).to_vec();     
-    //repo_list.iter().filter();
+    
     repo_list
 }
 
