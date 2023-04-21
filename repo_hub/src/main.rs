@@ -1,7 +1,9 @@
 use std::env;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use to_vec::ToVec;
+use regex::Regex;
 
 fn main() {
 
@@ -14,12 +16,23 @@ fn main() {
         3 => println!("too many args!"),
         _ => println!("todo"),
     }
-    println!("{:?}", get_status(get_repos(get_cwd())));
+    //println!("{:?}", get_status(get_repos(get_cwd())));
+    get_status(get_repos(get_cwd()));
 }
 
+//name extraction for the repo will not work if it has a slash on it, but whatever.
 fn get_status(repos : Vec<String>){
+    let _output_map : HashMap<String, Output>;
+    let re : Regex = Regex::new(r"([^/]+$)").unwrap();
+
     for path in repos{
-        println!("{}", &path);
+        let repo_name : String = re.find(&path).unwrap().as_str().to_string();
+        Command::new("cd").arg(&path);
+        let output : Output = Command::new("git").arg("status").stdout(Stdio::piped())
+            .output().expect("Not a git Repository!");
+        let status : String = String::from_utf8_lossy(&output.stdout).to_string();
+        println!("repository: {} | git status: {}", &repo_name, &status)
+        // | 1< | 2>| 1+ | 2~ | 0- |
     }
 }
 
