@@ -16,7 +16,6 @@ fn main() {
         3 => println!("too many args!"),
         _ => println!("todo"),
     }
-    //println!("{:?}", get_status(get_repos(get_cwd())));
     get_status(get_repos(get_cwd()));
 }
 
@@ -27,13 +26,37 @@ fn get_status(repos : Vec<String>){
 
     for path in repos{
         let repo_name : String = re.find(&path).unwrap().as_str().to_string();
-        Command::new("cd").arg(&path);
-        let output : Output = Command::new("git").arg("status").stdout(Stdio::piped())
+        assert!(env::set_current_dir(&path).is_ok());
+        assert_eq!(get_cwd().display().to_string(), path);
+
+        let output : Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
         let status : String = String::from_utf8_lossy(&output.stdout).to_string();
-        println!("repository: {} | git status: {}", &repo_name, &status)
-        // | 1< | 2>| 1+ | 2~ | 0- |
+        
+        //git status --short
+        println!("|{}:\n|_{}", &repo_name, filter_status_message(status));
+        // | 1u | 2| 1+ | 2~ | 0- |
     }
+}
+
+fn filter_status_message(m : String) -> String{
+    let gb : Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
+        .output().expect("Error!");
+    let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
+    //let s = m.to_owned();
+    // A added
+    let added : String = format!("{}", m.matches(" A ").count().to_string());
+    // ?? new file
+    let new_file : String = format!("{}", m.matches(" ?? ").count().to_string());
+    // M modified
+    let modified : &str = "0";
+    // D deleted
+    let deleted : &str = "0";
+    println!("{}", m);
+    // Your branch is up to date with 'origin/main'
+    let filtered = format!("[{}] | ?{} | +{} | ~{} | -{} |", branch, new_file, added, modified, deleted);
+
+    filtered
 }
 
 fn get_repos(path : PathBuf) -> Vec<String> {
