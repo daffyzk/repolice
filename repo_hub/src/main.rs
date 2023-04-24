@@ -1,5 +1,4 @@
 use std::env;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use to_vec::ToVec;
@@ -21,7 +20,7 @@ fn main() {
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
 fn get_status(repos : Vec<String>){
-    let _output_map : HashMap<String, Output>;
+    //let mut final_status : Vec<String> = vec![];
     let re : Regex = Regex::new(r"([^/]+$)").unwrap();
 
     for path in repos{
@@ -32,10 +31,8 @@ fn get_status(repos : Vec<String>){
         let output : Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
         let status : String = String::from_utf8_lossy(&output.stdout).to_string();
-        
-        //git status --short
-        println!("|{}:\n|_{}", &repo_name, filter_status_message(status));
-        // | 1u | 2| 1+ | 2~ | 0- |
+        println!("| {}: {}", &repo_name, filter_status_message(status));        
+        // todo add commits
     }
 }
 
@@ -43,18 +40,11 @@ fn filter_status_message(m : String) -> String{
     let gb : Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
         .output().expect("Error!");
     let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
-    //let s = m.to_owned();
-    // A added
-    let added : String = format!("{}", m.matches(" A ").count().to_string());
-    // ?? new file
-    let new_file : String = format!("{}", m.matches(" ?? ").count().to_string());
-    // M modified
-    let modified : &str = "0";
-    // D deleted
-    let deleted : &str = "0";
-    println!("{}", m);
-    // Your branch is up to date with 'origin/main'
-    let filtered = format!("[{}] | ?{} | +{} | ~{} | -{} |", branch, new_file, added, modified, deleted);
+    let filtered = format!("[{}]\n| ?{} | +{} | ~{} | -{} |", branch,
+        count_matches(&m, "?? "),
+        count_matches(&m, "A "),
+        count_matches(&m, "M "),
+        count_matches(&m, "D "));
 
     filtered
 }
@@ -70,6 +60,10 @@ fn get_repos(path : PathBuf) -> Vec<String> {
     let repo_list : Vec<String> = repo_results.lines().map(String::from).to_vec();     
     
     repo_list
+}
+
+fn count_matches(text : &String, sub_string : &str) -> String{
+    format!("{}", text.matches(&sub_string).count().to_string())
 }
 
 fn get_cwd() -> PathBuf{
