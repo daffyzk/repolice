@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 regex = "1.7.3"
 to_vec = "0.1.0"
+
+[[bin]]
+name = "repos"
+version = "0.1.0"
+path = "src/main.rs"

@@ -15,54 +15,75 @@ fn main() {
         3 => println!("too many args!"),
         _ => println!("todo"),
     }
-    get_status(get_repos(get_cwd()));
+    get_status(get_repos(get_cwd()), false);
 }
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
-fn get_status(repos : Vec<String>){
-    //let mut final_status : Vec<String> = vec![];
-    let re : Regex = Regex::new(r"([^/]+$)").unwrap();
+fn get_status(repos: Vec<String>, simple: bool){
+    let re: Regex = Regex::new(r"([^/]+$)").unwrap();
 
     for path in repos{
-        let repo_name : String = re.find(&path).unwrap().as_str().to_string();
+        let repo_name: String = re.find(&path).unwrap().as_str().to_string();
         assert!(env::set_current_dir(&path).is_ok());
         assert_eq!(get_cwd().display().to_string(), path);
 
-        let output : Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
+        let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
-        let status : String = String::from_utf8_lossy(&output.stdout).to_string();
-        println!("| {}: {}", &repo_name, filter_status_message(status));        
+        let status: String = String::from_utf8_lossy(&output.stdout).to_string();
+        println!("| {}: {}", &repo_name, status_message(status, simple));        
         // todo add commits
     }
 }
 
-fn filter_status_message(m : String) -> String{
-    let gb : Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
+fn status_message(m: String, simple: bool) -> String{
+    let gb: Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
         .output().expect("Error!");
     let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
-    let filtered = format!("[{}]\n| ?{} | +{} | ~{} | -{} |", branch,
-        count_matches(&m, "?? "),
-        count_matches(&m, "A "),
-        count_matches(&m, "M "),
-        count_matches(&m, "D "));
-
-    filtered
+    match simple {
+        true => { return format!("[{}]\n| ?{} | +{} | ~{} | -{} |\n", branch,
+                    count_matches(&m, "?? "),
+                    count_matches(&m, "A "),
+                    count_matches(&m, "M "),
+                    count_matches(&m, "D "));
+                }
+        false => {return format!("[{}]\n{}", branch, get_files_formatted(&m));
+                }
+    }
 }
 
-fn get_repos(path : PathBuf) -> Vec<String> {
-    let dir : String = path.into_os_string().into_string().unwrap();
-    let output : Output = Command::new("find")
+fn get_repos(path: PathBuf) -> Vec<String> {
+    let dir: String = path.into_os_string().into_string().unwrap();
+    let output: Output = Command::new("find")
         .args([&dir,"-name", ".git","-type", "d"])
         .stdout(Stdio::piped())
         .output().expect("Error!");
-    let repo_results : String = String::from_utf8_lossy(&output.stdout).to_string()
+    let repo_results: String = String::from_utf8_lossy(&output.stdout).to_string()
         .replace("/.git", "");
-    let repo_list : Vec<String> = repo_results.lines().map(String::from).to_vec();     
+    let repo_list: Vec<String> = repo_results.lines().map(String::from).to_vec();     
     
     repo_list
 }
 
-fn count_matches(text : &String, sub_string : &str) -> String{
+fn get_files_formatted(m: &String) -> String{
+format!("New Files:\n{}\nAdded Files:\n{}\nModified Files:\n{}\nDeleted Files:\n{}\n", 
+            get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap()),
+            get_files_list(&m, Regex::new(r"^A (.*)").unwrap()),
+            get_files_list(&m, Regex::new(r"^M (.*)").unwrap()),
+            get_files_list(&m, Regex::new(r"^D (.*)").unwrap())
+            ).to_string()
+
+}
+
+
+fn get_files_list(text: &String, re: Regex) -> String{
+    let mut strang: String = "".to_owned();
+    if let Some(mat) = re.find(text){
+        strang.push_str(mat.as_str());
+    }
+    strang
+}
+
+fn count_matches(text: &String, sub_string: &str) -> String{
     format!("{}", text.matches(&sub_string).count().to_string())
 }
 
