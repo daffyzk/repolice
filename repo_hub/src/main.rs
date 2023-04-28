@@ -65,22 +65,31 @@ fn get_repos(path: PathBuf) -> Vec<String> {
 }
 
 fn get_files_formatted(m: &String) -> String{
-format!("New Files:\n{}\nAdded Files:\n{}\nModified Files:\n{}\nDeleted Files:\n{}\n", 
-            get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap()),
-            get_files_list(&m, Regex::new(r"^A (.*)").unwrap()),
-            get_files_list(&m, Regex::new(r"^M (.*)").unwrap()),
-            get_files_list(&m, Regex::new(r"^D (.*)").unwrap())
-            ).to_string()
-
+format!("{}\n{}\n{}\n{}", 
+            get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap(), "New Files:\n".to_string()),
+            get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "Added Files:\n".to_string()),
+            get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "Modified Files:\n".to_string()),
+            get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "Deleted Files:\n".to_string())
+        ).to_string()
 }
 
+fn get_files_list(text: &String, re: Regex, title: String) -> String{
+    let mut strang: String = "".to_string();
 
-fn get_files_list(text: &String, re: Regex) -> String{
-    let mut strang: String = "".to_owned();
-    if let Some(mat) = re.find(text){
-        strang.push_str(mat.as_str());
+    for cap in re.captures_iter(text){
+        strang.push_str(&cap[1]);
     }
-    strang
+    
+    let s_len = strang.len().to_string().parse::<i32>().unwrap();
+
+    if s_len > 2{
+        strang.insert_str(0, &title);
+        return strang;
+    }
+    else {
+        strang.insert_str(0, &title);
+        return format!("No {}", strang.replace(":", "."));
+    }
 }
 
 fn count_matches(text: &String, sub_string: &str) -> String{
