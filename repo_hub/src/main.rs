@@ -10,11 +10,10 @@ fn main() {
     let arg_len = args.len().to_string().parse::<i32>().unwrap() - 1;
     match arg_len{
         0 => println!("no args"),
-        1 => println!("args: {}", &args[1]),
-        2 => println!("args: {} - {}", &args[1], &args[2]),
-        3 => println!("too many args!"),
+        1.. => parse_args(args),
         _ => println!("todo"),
     }
+    
     get_status(get_repos(get_cwd()), false);
 }
 
@@ -65,11 +64,11 @@ fn get_repos(path: PathBuf) -> Vec<String> {
 }
 
 fn get_files_formatted(m: &String) -> String{
-format!("{}\n{}\n{}\n{}", 
+    format!("{}{}{}{}", 
             get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap(), "New Files:\n".to_string()),
-            get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "Added Files:\n".to_string()),
-            get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "Modified Files:\n".to_string()),
-            get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "Deleted Files:\n".to_string())
+            get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "Added Files:\n".into()),
+            get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "Modified Files:\n".into()),
+            get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "Deleted Files:\n".into())
         ).to_string()
 }
 
@@ -78,6 +77,7 @@ fn get_files_list(text: &String, re: Regex, title: String) -> String{
 
     for cap in re.captures_iter(text){
         strang.push_str(&cap[1]);
+        strang.push_str("\n");
     }
     
     let s_len = strang.len().to_string().parse::<i32>().unwrap();
@@ -94,6 +94,16 @@ fn get_files_list(text: &String, re: Regex, title: String) -> String{
 
 fn count_matches(text: &String, sub_string: &str) -> String{
     format!("{}", text.matches(&sub_string).count().to_string())
+}
+
+fn parse_args(args : Vec<String>){
+    for arg in args {
+        match arg.as_str(){
+            "-x" => {println!("x was passed as parameter")},
+            "-f" => {println!("f was passed as parameter")},
+            _ => {},
+        }
+    }
 }
 
 fn get_cwd() -> PathBuf{
