@@ -52,9 +52,8 @@ fn get_repos(path: PathBuf) -> Vec<String> {
         .output().expect("Error!");
     let repo_results: String = String::from_utf8_lossy(&output.stdout).to_string()
         .replace("/.git", "");
-    let repo_list: Vec<String> = repo_results.lines().map(String::from).to_vec();
 
-    repo_list
+    repo_results.lines().map(String::from).to_vec()
 }
 
 fn get_files_formatted(m: &String) -> String{
@@ -123,7 +122,7 @@ fn get_files_list(_text: &String, _re: Regex, s: &str) -> String{
 }
 
 fn count_matches(text: &String, sub_string: &str) -> String{
-    format!("{}", text.matches(&sub_string).count().to_string())
+    text.matches(&sub_string).count().to_string()
 }
 
 fn parse_args(args : Vec<String>){
