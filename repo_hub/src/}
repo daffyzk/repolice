@@ -98,28 +98,20 @@ fn formatted_list (list: Vec<(String, String)>) -> String{
             not_list.get(3).unwrap()).to_string()},
         _ => {}
     }
-    if final_no_element_list.is_empty(){
-        return final_list;
-    }
-    else {
-        return format!("| No {} Files.\n{}", final_no_element_list, final_list).to_string();
-    }
+
+    format!("| No {} Files.\n{}", final_no_element_list, final_list).to_string()
 }
 
-
-
-
-fn get_files_list(_text: &String, _re: Regex, s: &str) -> String{
-    let mut _strang: String = "".to_string();
+fn get_files_list(text: &String, re: Regex, s: &str) -> String{
+    let mut strang: String = "".to_string();
     //not working correctly, only returns first value
-    //let cap = re.captures(text);
-        //println!("{}", cap.as_str().to_string());
-    //let matcher = cap.unwrap().get(1).map_or("", |m| m.as_str());
-    //let strr: String = format!("{}\n", matcher.replace(&s, "| __"));
-    //strang.push_str(&strr);
-    
-    //strang
-    format!("{} not working currently\n", s).to_string()
+    for cap in re.find_iter(text){
+        println!(cap);
+        let strr: String = format!("{}\n", cap.as_str().replace(&s, "| __"));
+        strang.push_str(&strr);
+    }
+
+    strang
 }
 
 fn count_matches(text: &String, sub_string: &str) -> String{
@@ -129,9 +121,6 @@ fn count_matches(text: &String, sub_string: &str) -> String{
 fn parse_args(args : Vec<String>){
     for arg in args {
         match arg.as_str(){
-            //problem where if other flags are passed, the program doesn't run
-            //could solve by creating an args collector function and running that based on the args
-            //provided
             "-x" => {get_status(get_repos(get_cwd()), false)},
             "-f" => {println!("f was passed as parameter")},
             _ => {},
