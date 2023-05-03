@@ -5,32 +5,27 @@ use to_vec::ToVec;
 use regex::Regex;
 
 fn main() {
-
     let args: Vec<String> = env::args().collect();
     let arg_len = args.len().to_string().parse::<i32>().unwrap() - 1;
     match arg_len{
-        0 => println!("no args"),
+        0 => get_status(get_repos(get_cwd()), true),
         1.. => parse_args(args),
-        _ => println!("todo"),
+        _ => {},
     }
-    
-    get_status(get_repos(get_cwd()), false);
 }
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
 fn get_status(repos: Vec<String>, simple: bool){
     let re: Regex = Regex::new(r"([^/]+$)").unwrap();
-
     for path in repos{
         let repo_name: String = re.find(&path).unwrap().as_str().to_string();
         assert!(env::set_current_dir(&path).is_ok());
-        assert_eq!(get_cwd().display().to_string(), path);
-
+        //assert_eq!(get_cwd().display().to_string(), path);
         let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
         let status: String = String::from_utf8_lossy(&output.stdout).to_string();
+
         println!("| {}: {}", &repo_name, status_message(status, simple));        
-        // todo add commits
     }
 }
 
@@ -45,8 +40,7 @@ fn status_message(m: String, simple: bool) -> String{
                     count_matches(&m, "M "),
                     count_matches(&m, "D "));
                 }
-        false => {return format!("[{}]\n{}", branch, get_files_formatted(&m));
-                }
+        false => {return format!("[{}]\n{}", branch, get_files_formatted(&m));}
     }
 }
 
@@ -58,38 +52,60 @@ fn get_repos(path: PathBuf) -> Vec<String> {
         .output().expect("Error!");
     let repo_results: String = String::from_utf8_lossy(&output.stdout).to_string()
         .replace("/.git", "");
-    let repo_list: Vec<String> = repo_results.lines().map(String::from).to_vec();     
-    
+    let repo_list: Vec<String> = repo_results.lines().map(String::from).to_vec();
+
     repo_list
 }
 
 fn get_files_formatted(m: &String) -> String{
-    format!("{}{}{}{}", 
-            get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap(), "New Files:\n".to_string()),
-            get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "Added Files:\n".into()),
-            get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "Modified Files:\n".into()),
-            get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "Deleted Files:\n".into())
-        ).to_string()
+    let mut file_list: Vec<(String, String)> = vec![];
+    file_list.push(("New".to_string(), get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap(), "??")));
+    file_list.push(("Added".to_string(), get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "A")));
+    file_list.push(("Modified".to_string(), get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "M")));
+    file_list.push(("Deleted".to_string(), get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "D")));
+    
+    formatted_list(file_list)
 }
 
-fn get_files_list(text: &String, re: Regex, title: String) -> String{
+fn formatted_list (list: Vec<(String, String)>) -> String{
+    let mut final_list: String = "".to_string();
+    let mut no_element_list: Vec<String> = vec![];
+    for item in list {
+        let i_s = item.1.len().to_string().parse::<i32>().unwrap();
+        if i_s > 1 {
+            let title: String = format!("| {} Files:\n", item.0).to_string();
+            final_list.push_str(&title);
+            final_list.push_str(&item.1);
+        }
+        else {
+            no_element_list.push(item.0);
+        }
+    }
+    let mut final_no_element_list: String = "".to_string();
+    let e_s = no_element_list.len().to_string().parse::<i32>().unwrap();
+    match e_s {
+        1 => {final_no_element_list = format!("{}", no_element_list.get(0).unwrap()).to_string()},
+        2 => {final_no_element_list = format!("{} or {}", no_element_list.get(0).unwrap(), 
+            no_element_list.get(1).unwrap()).to_string()},
+        3 => {final_no_element_list = format!("{}, {} or {}", no_element_list.get(0).unwrap(),
+            no_element_list.get(1).unwrap(), no_element_list.get(2).unwrap()).to_string()},
+        4 => {final_no_element_list = format!("{}, {}, {} or {}", no_element_list.get(0).unwrap(), 
+            no_element_list.get(1).unwrap(), no_element_list.get(2).unwrap(), 
+            no_element_list.get(3).unwrap()).to_string()},
+        _ => {}
+    }
+
+    format!("| No {} Files.\n{}", final_no_element_list, final_list).to_string()
+}
+
+fn get_files_list(text: &String, re: Regex, s: &str) -> String{
     let mut strang: String = "".to_string();
+    for cap in re.find_iter(text){
+        let strr: String = format!("{}\n", cap.as_str().replace(&s, "|    "));
+        strang.push_str(&strr);
+    }
 
-    for cap in re.captures_iter(text){
-        strang.push_str(&cap[1]);
-        strang.push_str("\n");
-    }
-    
-    let s_len = strang.len().to_string().parse::<i32>().unwrap();
-
-    if s_len > 2{
-        strang.insert_str(0, &title);
-        return strang;
-    }
-    else {
-        strang.insert_str(0, &title);
-        return format!("No {}", strang.replace(":", "."));
-    }
+    strang
 }
 
 fn count_matches(text: &String, sub_string: &str) -> String{
@@ -99,7 +115,7 @@ fn count_matches(text: &String, sub_string: &str) -> String{
 fn parse_args(args : Vec<String>){
     for arg in args {
         match arg.as_str(){
-            "-x" => {println!("x was passed as parameter")},
+            "-x" => {get_status(get_repos(get_cwd()), false)},
             "-f" => {println!("f was passed as parameter")},
             _ => {},
         }
