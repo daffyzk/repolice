@@ -104,9 +104,6 @@ fn formatted_list (list: Vec<(String, String)>) -> String{
     }
 }
 
-
-
-
 fn get_files_list(text: &String, re: Regex) -> String{
     let mut strang: String = "".to_string();
     for cap in re.captures_iter(text){
