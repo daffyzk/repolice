@@ -20,7 +20,6 @@ fn get_status(repos: Vec<String>, simple: bool){
     for path in repos{
         let repo_name: String = re.find(&path).unwrap().as_str().to_string();
         assert!(env::set_current_dir(&path).is_ok());
-        //assert_eq!(get_cwd().display().to_string(), path);
         let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
         let status: String = String::from_utf8_lossy(&output.stdout).to_string();
@@ -58,10 +57,10 @@ fn get_repos(path: PathBuf) -> Vec<String> {
 
 fn get_files_formatted(m: &String) -> String{
     let mut file_list: Vec<(String, String)> = vec![];
-    file_list.push(("New".to_string(), get_files_list(&m, Regex::new(r"^\?\? (.*)").unwrap(), "??")));
-    file_list.push(("Added".to_string(), get_files_list(&m, Regex::new(r"^A (.*)").unwrap(), "A")));
-    file_list.push(("Modified".to_string(), get_files_list(&m, Regex::new(r"^M (.*)").unwrap(), "M")));
-    file_list.push(("Deleted".to_string(), get_files_list(&m, Regex::new(r"^D (.*)").unwrap(), "D")));
+    file_list.push(("New".to_string(), get_files_list(&m, Regex::new(r"\?\? (.*)\n").unwrap())));
+    file_list.push(("Added".to_string(), get_files_list(&m, Regex::new(r"A (.*)\n").unwrap())));
+    file_list.push(("Modified".to_string(), get_files_list(&m, Regex::new(r"M (.*)\n").unwrap())));
+    file_list.push(("Deleted".to_string(), get_files_list(&m, Regex::new(r"D (.*)\n").unwrap())));
     
     formatted_list(file_list)
 }
@@ -108,17 +107,14 @@ fn formatted_list (list: Vec<(String, String)>) -> String{
 
 
 
-fn get_files_list(_text: &String, _re: Regex, s: &str) -> String{
-    let mut _strang: String = "".to_string();
-    //not working correctly, only returns first value
-    //let cap = re.captures(text);
-        //println!("{}", cap.as_str().to_string());
-    //let matcher = cap.unwrap().get(1).map_or("", |m| m.as_str());
-    //let strr: String = format!("{}\n", matcher.replace(&s, "| __"));
-    //strang.push_str(&strr);
+fn get_files_list(text: &String, re: Regex) -> String{
+    let mut strang: String = "".to_string();
+    for cap in re.captures_iter(text){
+        let m: String = format!("| _ {}\n", &cap[1]);
+        strang.push_str(&m);
+    }
     
-    //strang
-    format!("{} not working currently\n", s).to_string()
+    strang
 }
 
 fn count_matches(text: &String, sub_string: &str) -> String{
