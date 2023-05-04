@@ -123,7 +123,10 @@ fn parse_args(args : Vec<String>){
         match arg.as_str(){
             //problem where if other flags are passed, the program doesn't run
             //could solve by creating an args collector function and running that
-            //based on the provided arguments --- maybe 
+            //based on the provided arguments --- maybe
+            //
+            //other problem with using a match statement, can't parse 
+            //path or depth values that are passed next to the flags
             
             //___    help   ___
             "-h" | "--help" => {println!("no help on sight")},
