@@ -125,10 +125,19 @@ fn parse_args(args : Vec<String>){
     for arg in args {
         match arg.as_str(){
             //problem where if other flags are passed, the program doesn't run
-            //could solve by creating an args collector function and running that based on the args
-            //provided
-            "-x" => {get_status(get_repos(get_cwd()), false)},
-            "-f" => {println!("f was passed as parameter")},
+            //could solve by creating an args collector function and running that
+            //based on the provided arguments --- maybe 
+            
+            //___    help   ___
+            "-h" | "--help" => {println!("no help on sight")},
+            //___    path   ___
+            "-p" | "--path" => {},
+            //___   depth   ___
+            "-d" | "--depth" => {},
+            //___ expressive___
+            "-x" | "--expressive" => {get_status(get_repos(get_cwd()), false)},
+            //___   fetch   ___
+            "-f" | "--fetch" => {println!("fetching is not implemented")},
             _ => {},
         }
     }
