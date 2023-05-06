@@ -129,18 +129,34 @@ fn parse_args(args : Vec<String>){
             //path or depth values that are passed next to the flags
             
             //___    help   ___
-            "-h" | "--help" => {println!("no help on sight")},
+            "-h" | "--help"       => {print_help()},
             //___    path   ___
-            "-p" | "--path" => {},
+            "-p" | "--path"       => {/* args.next?*/},
             //___   depth   ___
-            "-d" | "--depth" => {},
+            "-d" | "--depth"      => {},
             //___ expressive___
             "-x" | "--expressive" => {get_status(get_repos(get_cwd()), false)},
             //___   fetch   ___
-            "-f" | "--fetch" => {println!("fetching is not implemented")},
+            "-f" | "--fetch"      => {println!("fetching is not implemented")},
             _ => {},
         }
     }
+}
+
+fn print_help(){
+    let title: &str =
+    "A simple list the status of all git repositories under a directory\n\nOptions:";
+    let options1: &str =
+    "-h | --help            displays an explanation of the basic functionality and all options";
+    let options2: &str =
+    "-p | --path [path]     set a specific path to run instead of the current directory";
+    let options3: &str =
+    "-d | --depth [num]     set a max directory depth for the repositorie search";
+    let options4: &str =
+    "-x | --expressive      displays a more verbose list of the files staged for commits";
+    let options5: &str =
+    "-f | --fetch           displays the status the repository if it has new files or branches";
+    println!("\n\n\n{}\n\n{}\n{}\n{}\n{}\n{}\n", &title, &options1, &options2, &options3, &options4, &options5);
 }
 
 fn get_cwd() -> PathBuf{
