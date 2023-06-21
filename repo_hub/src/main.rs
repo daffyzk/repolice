@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use to_vec::ToVec;
 use regex::Regex;
+use getopts::Options;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -122,13 +123,8 @@ fn parse_args(args : Vec<String>){
     for arg in args {
         match arg.as_str(){
             //problem where if other flags are passed, the program doesn't run
-            //could solve by creating an args collector function and running that
-            //based on the provided arguments --- maybe
-            //
-            //other problem with using a match statement, can't parse 
-            //path or depth values that are passed next to the flags
-            
-            //___    help   ___
+            //could solve by creating an args collect
+            //___    help   __
             "-h" | "--help"       => {print_help()},
             //___    path   ___
             "-p" | "--path"       => {/* args.next?*/},
