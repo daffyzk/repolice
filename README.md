@@ -14,4 +14,3 @@ This returns a list of the status of all repos within that directory. With the a
 You can also specify an expressive return with the '-x' option.
 You can also specify the directory depth of searches with the '-d [int]' option. 
 There is a '-h' option that lists all options and explains the functionality.
-There is also a man file that contains the same as the -h option.

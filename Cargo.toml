@@ -1,5 +1,5 @@
 [package]
-name = "repo_hub"
+name = "repo-hub"
 version = "0.1.0"
 edition = "2021"
 
