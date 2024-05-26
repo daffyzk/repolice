@@ -3,28 +3,73 @@ use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use to_vec::ToVec;
 use regex::Regex;
-use getopts::Options;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Set a specific path to run in, instead of the current directory
+    #[arg(short, long, value_name = "PATH")]
+    path: Option<String>,
+
+    /// Set a max depth to search for repositories in the file-system
+    #[arg(short, long, value_name = "DEPTH")]
+    depth: Option<i8>,
+
+    /// Display a more verbose list of files staged for commits 
+    #[arg(short, long, action)]
+    verbose: Option<bool>,
+    
+    /// displays the status the repository if it has new files or branches
+    #[arg(short, long, action)]
+    fetch: Option<bool>,
+
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let arg_len = args.len().to_string().parse::<i32>().unwrap() - 1;
-    match arg_len{
-        0 => get_status(get_repos(get_cwd()), true),
-        1.. => parse_args(args),
-        _ => {},
+    let mut exec_path : PathBuf = get_cwd();
+    let mut exec_depth : i8 = 127; 
+    let mut exec_simple : bool = true; 
+    let mut exec_fetch : bool = false;
+
+    let args = Args::parse();
+
+    match args.path{
+        Some(p) => {exec_path = PathBuf::from(p)},
+        None => {},
     }
+
+    match args.verbose{
+        Some(_) => {exec_simple = false},
+        None => {},
+    }
+
+    match args.depth{
+        Some(d) => {exec_depth = d; println!("depth = {}, {}", d, exec_depth)},
+        None => {},
+    }
+
+    match args.verbose{
+        Some(f) => {exec_fetch = true; println!("fetch = {}, {}", f, exec_fetch)},
+        None => {},
+    }
+    
+    get_status(get_repos(exec_path), exec_simple);
 }
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
-fn get_status(repos: Vec<String>, simple: bool){
+fn get_status(repo_list: Vec<String>, simple: bool){
     let re: Regex = Regex::new(r"([^/]+$)").unwrap();
-    for path in repos{
+    for path in repo_list{
         let repo_name: String = re.find(&path).unwrap().as_str().to_string();
         assert!(env::set_current_dir(&path).is_ok());
+
+        // could check with 'git remote get-url origin' to see if it's a hosted repository and return different response based on that information
         let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
             .output().expect("Not a git Repository!");
         let status: String = String::from_utf8_lossy(&output.stdout).to_string();
 
+        // This is where it all renders out (one print line statement lol)
         println!("| {}: {}", &repo_name, status_message(status, simple));        
     }
 }
@@ -66,7 +111,7 @@ fn get_files_formatted(m: &String) -> String{
     formatted_list(file_list)
 }
 
-fn formatted_list (list: Vec<(String, String)>) -> String{
+fn formatted_list(list: Vec<(String, String)>) -> String{
     let mut final_list: String = "".to_string();
     let mut not_list: Vec<String> = vec![];
     for item in list {
@@ -117,42 +162,6 @@ fn get_files_list(text: &String, re: Regex) -> String{
 
 fn count_matches(text: &String, sub_string: &str) -> String{
     text.matches(&sub_string).count().to_string()
-}
-
-fn parse_args(args : Vec<String>){
-    for arg in args {
-        match arg.as_str(){
-            //problem where if other flags are passed, the program doesn't run
-            //could solve by creating an args collect
-            //___    help   __
-            "-h" | "--help"       => {print_help()},
-            //___    path   ___
-            "-p" | "--path"       => {/* args.next?*/},
-            //___   depth   ___
-            "-d" | "--depth"      => {},
-            //___ expressive___
-            "-x" | "--expressive" => {get_status(get_repos(get_cwd()), false)},
-            //___   fetch   ___
-            "-f" | "--fetch"      => {println!("fetching is not implemented")},
-            _ => {},
-        }
-    }
-}
-
-fn print_help(){
-    let title: &str =
-    "A simple list the status of all git repositories under a directory\n\nOptions:";
-    let options1: &str =
-    "-h | --help            displays an explanation of the basic functionality and all options";
-    let options2: &str =
-    "-p | --path [path]     set a specific path to run instead of the current directory";
-    let options3: &str =
-    "-d | --depth [num]     set a max directory depth for the repositorie search";
-    let options4: &str =
-    "-x | --expressive      displays a more verbose list of the files staged for commits";
-    let options5: &str =
-    "-f | --fetch           displays the status the repository if it has new files or branches";
-    println!("\n\n\n{}\n\n{}\n{}\n{}\n{}\n{}\n", &title, &options1, &options2, &options3, &options4, &options5);
 }
 
 fn get_cwd() -> PathBuf{
