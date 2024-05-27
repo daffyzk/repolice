@@ -1,9 +1,13 @@
 use std::env;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
+use std::thread;
+use std::time::Duration;
 use to_vec::ToVec;
 use regex::Regex;
+
 use clap::Parser;
+use console::Term;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -12,7 +16,7 @@ struct Args {
     #[arg(short, long, value_name = "PATH")]
     path: Option<String>,
 
-    /// Set a max depth to search for repositories in the file-system
+    /// Set a max depth of search for repositories in the file-system
     #[arg(short, long, value_name = "DEPTH")]
     depth: Option<i8>,
 
@@ -20,7 +24,7 @@ struct Args {
     #[arg(short, long, action)]
     verbose: Option<bool>,
     
-    /// displays the status the repository if it has new files or branches
+    /// Display if a repository has any new upstream changeUsually you'll see Result<()> in documentation to signify that a result alias is being used. If you click on it (rust doc) it will show you the alias declaration. The standard library std::io module declares the followings on files / branches
     #[arg(short, long, action)]
     fetch: Option<bool>,
 
@@ -45,15 +49,15 @@ fn main() {
     }
 
     match args.depth{
-        Some(d) => {exec_depth = d; println!("depth = {}, {}", d, exec_depth)},
+        Some(d) => {exec_depth = d; println!("Not Implemented - Depth = {}, {}", d, exec_depth)},
         None => {},
     }
 
     match args.verbose{
-        Some(f) => {exec_fetch = true; println!("fetch = {}, {}", f, exec_fetch)},
+        Some(f) => {exec_fetch = true; println!("Not Implemented - Fetch = {}, {}", f, exec_fetch)},
         None => {},
     }
-    
+
     get_status(get_repos(exec_path), exec_simple);
 }
 
@@ -70,6 +74,12 @@ fn get_status(repo_list: Vec<String>, simple: bool){
         let status: String = String::from_utf8_lossy(&output.stdout).to_string();
 
         // This is where it all renders out (one print line statement lol)
+        let term = Term::stdout();
+        term.write_line("Hello World!");
+
+        thread::sleep(Duration::from_millis(2000));
+        term.clear_line();
+
         println!("| {}: {}", &repo_name, status_message(status, simple));        
     }
 }
