@@ -1,13 +1,10 @@
 use std::env;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
-use std::thread;
-use std::time::Duration;
 use to_vec::ToVec;
 use regex::Regex;
 
 use clap::Parser;
-use console::Term;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -58,7 +55,9 @@ fn main() {
         None => {},
     }
 
+
     get_status(get_repos(exec_path), exec_simple);
+
 }
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
@@ -73,14 +72,9 @@ fn get_status(repo_list: Vec<String>, simple: bool){
             .output().expect("Not a git Repository!");
         let status: String = String::from_utf8_lossy(&output.stdout).to_string();
 
-        // This is where it all renders out (one print line statement lol)
-        let term = Term::stdout();
-        term.write_line("Hello World!");
-
-        thread::sleep(Duration::from_millis(2000));
-        term.clear_line();
-
-        println!("| {}: {}", &repo_name, status_message(status, simple));        
+        // This is where it all renders out
+        println!("| {}: {}", &repo_name, status_message(status, simple));
+        
     }
 }
 

@@ -2,7 +2,7 @@
 name = "repo-hub"
 version = "0.1.0"
 edition = "2021"
-description = "A simple program to list the status of all git repositories under a directory, use `-h` to view help..."
+description = "A simple program to list the status of all git repositories under a directory"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,7 +11,6 @@ regex = "1.7.3"
 to_vec = "0.1.0"
 getopts = "0.2.21"
 clap = { version = "4.5.4", features = ["derive"] }
-console = "0.15.8"
 
 [[bin]]
 name = "repos"
