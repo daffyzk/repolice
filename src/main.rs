@@ -79,7 +79,10 @@ fn status_message(m: String, simple: bool) -> String{
         .output().expect("Error!");
     let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
     match simple {
-        true => { return format!("[{}]\n| ?{} | +{} | ~{} | -{} |\n", branch,
+        true => { 
+            // here maybe collect matches and return nothing ?? idk probably better to refactor
+            // the whole thing
+            return format!("[{}]\n| ?{} | +{} | ~{} | -{} |\n", branch,
                     count_matches(&m, "?? "),
                     count_matches(&m, "A "),
                     count_matches(&m, "M "),
