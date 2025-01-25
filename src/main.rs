@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::thread;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
@@ -14,13 +16,13 @@ struct Args {
 
     /// Set a max depth to search for repositories in the file-system
     #[arg(short, long, value_name = "DEPTH")]
-    depth: Option<i8>,
+    depth: Option<u8>,
 
     /// Display a more verbose list of files staged for commits 
     #[arg(short, long, action)]
     verbose: Option<bool>,
     
-    /// displays the status the repository if it has new files or branches
+    /// Display the status for a repository if it has new files or branches
     #[arg(short, long, action)]
     fetch: Option<bool>,
 
@@ -28,7 +30,7 @@ struct Args {
 
 fn main() {
     let mut exec_path : PathBuf = get_cwd();
-    let mut exec_depth : i8 = 127; 
+    let mut exec_depth : u8 = 10; 
     let mut exec_simple : bool = true; 
     let mut exec_fetch : bool = false;
 
@@ -49,29 +51,41 @@ fn main() {
         None => {},
     }
 
-    match args.verbose{
-        Some(f) => {exec_fetch = true; println!("fetch = {}, {}", f, exec_fetch)},
+    match args.fetch{
+        Some(_) => {exec_fetch = true; println!("fetch = {}", exec_fetch)},
         None => {},
     }
     
-    get_status(get_repos(exec_path), exec_simple);
+    get_status(get_repos(exec_path), exec_simple, exec_depth);
 }
 
+
 //name extraction for the repo will not work if it has a slash on it, but whatever.
-fn get_status(repo_list: Vec<String>, simple: bool){
-    let re: Regex = Regex::new(r"([^/]+$)").unwrap();
+fn get_status(repo_list: Vec<String>, simple: bool, depth: u8){
+    let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
+
+    println!("{}", depth);
+
     for path in repo_list{
-        let repo_name: String = re.find(&path).unwrap().as_str().to_string();
-        assert!(env::set_current_dir(&path).is_ok());
+        let new_path = path.clone();
+        let new_re = re.clone();
 
-        // could check with 'git remote get-url origin' to see if it's a hosted repository and return different response based on that information
-        let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
-            .output().expect("Not a git Repository!");
-        let status: String = String::from_utf8_lossy(&output.stdout).to_string();
+        let thread = thread::spawn(move || {
+            let repo_name: String = new_re.find(new_path.clone().as_str()).unwrap().as_str().to_string();
+            assert!(env::set_current_dir(new_path.clone().as_str()).is_ok());
 
-        // This is where it all renders out (one print line statement lol)
-        println!("| {}: {}", &repo_name, status_message(status, simple));        
+            // could check with 'git remote get-url origin' to see if it's a hosted repository 
+            // and return different response based on that information
+            let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
+                .output().expect("Not a git Repository!");
+            let status: String = String::from_utf8_lossy(&output.stdout).to_string();
+
+            // This is where it all renders out (one print line statement lol)
+            println!("| {}: {}", &repo_name, status_message(status, simple));   
+        }); 
+        thread.join().unwrap(); 
     }
+
 }
 
 fn status_message(m: String, simple: bool) -> String{
