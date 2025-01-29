@@ -60,6 +60,24 @@ fn main() {
 }
 
 
+struct Repository {
+    title: String,
+    content: String,
+}
+
+struct RepositoryList {
+    repos: Vec<Repository>
+}
+
+impl RepositoryList {
+    fn print()  {
+        // depending on the screen width, print x parallel repositories at the same time?
+        // 
+        println!("yeha");
+    }
+}
+
+
 //name extraction for the repo will not work if it has a slash on it, but whatever.
 fn get_status(repo_list: Vec<String>, simple: bool, depth: u8){
     let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
