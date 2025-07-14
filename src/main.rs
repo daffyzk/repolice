@@ -53,7 +53,7 @@ fn main() {
 
     match args.fetch{
         Some(_) => {exec_fetch = true; println!("fetch = {}", exec_fetch)},
-        None => {},
+        None => {println!("fetch = {}", exec_fetch)},
     }
     
     get_status(get_repos(exec_path), exec_simple, exec_depth);
