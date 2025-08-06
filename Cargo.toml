@@ -1,10 +1,8 @@
 [package]
-name = "repo-hub"
+name = "repolice"
 version = "0.1.0"
 edition = "2021"
-description = "A simple program to list the status of all git repositories under a directory, use `-h` to view help..."
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "TUI that lists the status of all git repositories under a directory tree, use `-h` to view help..."
 
 [dependencies]
 regex = "1.7.3"
@@ -13,6 +11,6 @@ getopts = "0.2.21"
 clap = { version = "4.5.4", features = ["derive"] }
 
 [[bin]]
-name = "repos"
+name = "repolice"
 version = "0.1.0"
 path = "src/main.rs"
