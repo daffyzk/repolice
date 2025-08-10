@@ -1,7 +1,7 @@
 [package]
 name = "repolice"
-version = "0.1.0"
-edition = "2021"
+version = "0.0.1"
+edition = "2024"
 description = "TUI that lists the status of all git repositories under a directory tree, use `-h` to view help..."
 
 [dependencies]
@@ -12,5 +12,5 @@ clap = { version = "4.5.4", features = ["derive"] }
 
 [[bin]]
 name = "repolice"
-version = "0.1.0"
+version = "0.0.1"
 path = "src/main.rs"
