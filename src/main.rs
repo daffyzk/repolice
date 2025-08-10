@@ -21,16 +21,16 @@ struct Args {
     depth: Option<u8>,
 
     /// Display a more verbose list of files staged for commits 
-    #[arg(short, long, action)]
-    verbose: Option<bool>,
+    #[arg(short, long)]
+    verbose: bool,
     
     /// Display the status for a repository if it has new files or branches
-    #[arg(short, long, action)]
-    fetch: Option<bool>,
+    #[arg(short, long)]
+    fetch: bool,
 
     /// Disable TUI and print to stdout instead
     #[arg(long)]
-    no_tui: Option<bool>,
+    no_tui: bool,
 
 }
 
@@ -39,22 +39,12 @@ fn main() {
     
     let mut exec_path : PathBuf = get_cwd();
     let mut exec_depth : u8 = 10; 
-    let mut exec_simple : bool = true; 
-    let mut exec_fetch : bool = false;
-    let mut exec_no_tui : bool = false;
-
-    match args.no_tui{
-        Some(p) => {exec_no_tui = p},
-        None => {},
-    }
+    let exec_no_tui : bool = args.no_tui;
+    let exec_verbose : bool = args.verbose; 
+    let exec_fetch : bool = false;
 
     match args.path{
         Some(p) => {exec_path = PathBuf::from(p)},
-        None => {},
-    }
-
-    match args.verbose{
-        Some(_) => {exec_simple = false},
         None => {},
     }
 
@@ -63,23 +53,21 @@ fn main() {
         None => {},
     }
 
-    match args.fetch{
-        Some(_) => {exec_fetch = true; println!("fetch = {}", exec_fetch)},
-        None => {println!("fetch = {}", exec_fetch)},
+    if args.fetch {
+        println!("fetch = {}", exec_fetch)
     }
-
     
-    let repos = collect_repo_info(reader::get_repos(exec_path.clone()), exec_simple, exec_depth);
+    let repos = collect_repo_info(reader::get_repos(exec_path.clone()), exec_verbose, exec_depth);
     
     if exec_no_tui {
-        print_repos_simple(repos, exec_simple);
+        print_repos_simple(repos, exec_verbose);
     } else {
-        match tui::run_tui_with_repos(repos, exec_simple) {
+        match tui::run_tui_with_repos(repos, exec_verbose) {
             Ok(_) => {},
             Err(_) => {
                 println!("TUI failed, falling back to simple output...");
-                let repos = collect_repo_info(reader::get_repos(exec_path), exec_simple, exec_depth);
-                print_repos_simple(repos, exec_simple);
+                let repos = collect_repo_info(reader::get_repos(exec_path), exec_verbose, exec_depth);
+                print_repos_simple(repos, exec_verbose);
             }
         }
     }
@@ -87,7 +75,7 @@ fn main() {
 
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
-fn collect_repo_info(repo_list: Vec<String>, simple: bool, _depth: u8) -> Vec<tui::RepoInfo> {
+fn collect_repo_info(repo_list: Vec<String>, verbose: bool, _depth: u8) -> Vec<tui::RepoInfo> {
     let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
     let mut repos = Vec::new();
 
@@ -117,7 +105,7 @@ fn collect_repo_info(repo_list: Vec<String>, simple: bool, _depth: u8) -> Vec<tu
                 added_files: count_matches(&status, "A "),
                 modified_files: count_matches(&status, "M "),
                 deleted_files: count_matches(&status, "D "),
-                verbose_info: if simple { String::new() } else { get_files_formatted(&status) },
+                verbose_info: if verbose{ get_files_formatted(&status) } else { String::new() },
             }
         });
         repos.push(thread.join().unwrap());
