@@ -3,9 +3,10 @@ use std::thread;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
-use to_vec::ToVec;
 use regex::Regex;
 use clap::Parser;
+
+mod reader;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -56,7 +57,7 @@ fn main() {
         None => {println!("fetch = {}", exec_fetch)},
     }
     
-    get_status(get_repos(exec_path), exec_simple, exec_depth);
+    get_status(reader::get_repos(exec_path), exec_simple, exec_depth);
 }
 
 
@@ -103,17 +104,6 @@ fn status_message(m: String, simple: bool) -> String{
     }
 }
 
-fn get_repos(path: PathBuf) -> Vec<String> {
-    let dir: String = path.into_os_string().into_string().unwrap();
-    let output: Output = Command::new("find")
-        .args([&dir,"-name", ".git","-type", "d"])
-        .stdout(Stdio::piped())
-        .output().expect("Error!");
-    let repo_results: String = String::from_utf8_lossy(&output.stdout).to_string()
-        .replace("/.git", "");
-
-    repo_results.lines().map(String::from).to_vec()
-}
 
 fn get_files_formatted(m: &String) -> String{
     let mut file_list: Vec<(String, String)> = vec![];
