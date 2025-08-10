@@ -7,6 +7,7 @@ use regex::Regex;
 use clap::Parser;
 
 mod reader;
+mod tui;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -27,15 +28,25 @@ struct Args {
     #[arg(short, long, action)]
     fetch: Option<bool>,
 
+    /// Disable TUI and print to stdout instead
+    #[arg(long)]
+    no_tui: Option<bool>,
+
 }
 
 fn main() {
+    let args = Args::parse();
+    
     let mut exec_path : PathBuf = get_cwd();
     let mut exec_depth : u8 = 10; 
     let mut exec_simple : bool = true; 
     let mut exec_fetch : bool = false;
+    let mut exec_no_tui : bool = false;
 
-    let args = Args::parse();
+    match args.no_tui{
+        Some(p) => {exec_no_tui = p},
+        None => {},
+    }
 
     match args.path{
         Some(p) => {exec_path = PathBuf::from(p)},
@@ -56,18 +67,31 @@ fn main() {
         Some(_) => {exec_fetch = true; println!("fetch = {}", exec_fetch)},
         None => {println!("fetch = {}", exec_fetch)},
     }
+
     
-    get_status(reader::get_repos(exec_path), exec_simple, exec_depth);
+    let repos = collect_repo_info(reader::get_repos(exec_path.clone()), exec_simple, exec_depth);
+    
+    if exec_no_tui {
+        print_repos_simple(repos, exec_simple);
+    } else {
+        match tui::run_tui_with_repos(repos, exec_simple) {
+            Ok(_) => {},
+            Err(_) => {
+                println!("TUI failed, falling back to simple output...");
+                let repos = collect_repo_info(reader::get_repos(exec_path), exec_simple, exec_depth);
+                print_repos_simple(repos, exec_simple);
+            }
+        }
+    }
 }
 
 
 //name extraction for the repo will not work if it has a slash on it, but whatever.
-fn get_status(repo_list: Vec<String>, simple: bool, depth: u8){
+fn collect_repo_info(repo_list: Vec<String>, simple: bool, _depth: u8) -> Vec<tui::RepoInfo> {
     let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
+    let mut repos = Vec::new();
 
-    println!("{}", depth);
-
-    for path in repo_list{
+    for path in repo_list {
         let new_path = path.clone();
         let new_re = re.clone();
 
@@ -75,34 +99,49 @@ fn get_status(repo_list: Vec<String>, simple: bool, depth: u8){
             let repo_name: String = new_re.find(new_path.clone().as_str()).unwrap().as_str().to_string();
             assert!(env::set_current_dir(new_path.clone().as_str()).is_ok());
 
-            // could check with 'git remote get-url origin' to see if it's a hosted repository 
-            // and return different response based on that information
+            // Get git status --short for file status
             let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
                 .output().expect("Not a git Repository!");
             let status: String = String::from_utf8_lossy(&output.stdout).to_string();
 
-            // This is where it all renders out (one print line statement lol)
-            println!("| {}: {}", &repo_name, status_message(status, simple));   
-        }); 
-        thread.join().unwrap(); 
+            // Get current branch
+            let gb: Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
+                .output().expect("Error!");
+            let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
+
+
+            tui::RepoInfo {
+                name: repo_name,
+                branch,
+                new_files: count_matches(&status, "?? "),
+                added_files: count_matches(&status, "A "),
+                modified_files: count_matches(&status, "M "),
+                deleted_files: count_matches(&status, "D "),
+                verbose_info: if simple { String::new() } else { get_files_formatted(&status) },
+            }
+        });
+        repos.push(thread.join().unwrap());
     }
 
+    repos
 }
 
-fn status_message(m: String, simple: bool) -> String{
-    let gb: Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
-        .output().expect("Error!");
-    let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
-    match simple {
-        true => { return format!("[{}]\n| ?{} | +{} | ~{} | -{} |\n", branch,
-                    count_matches(&m, "?? "),
-                    count_matches(&m, "A "),
-                    count_matches(&m, "M "),
-                    count_matches(&m, "D "));
-                }
-        false => {return format!("[{}]\n{}", branch, get_files_formatted(&m));}
+fn print_repos_simple(repos: Vec<tui::RepoInfo>, simple: bool) {
+    for repo in repos {
+        if simple {
+            println!("| {}: [{}]", repo.name, repo.branch);
+            println!("| ?{} | +{} | ~{} | -{} |", 
+                repo.new_files, repo.added_files, repo.modified_files, repo.deleted_files);
+        } else {
+            println!("| {}: [{}]", repo.name, repo.branch);
+            println!("| ?{} | +{} | ~{} | -{} |", 
+                repo.new_files, repo.added_files, repo.modified_files, repo.deleted_files);
+            println!("{}", repo.verbose_info);
+        }
+        println!("");
     }
 }
+
 
 
 fn get_files_formatted(m: &String) -> String{
@@ -167,6 +206,7 @@ fn get_files_list(text: &String, re: Regex) -> String{
 fn count_matches(text: &String, sub_string: &str) -> String{
     text.matches(&sub_string).count().to_string()
 }
+
 
 fn get_cwd() -> PathBuf{
     env::current_dir().unwrap()
