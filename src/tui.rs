@@ -17,10 +17,10 @@ use ratatui::{
 pub struct RepoInfo {
     pub name: String,
     pub branch: String,
-    pub new_files: String,
-    pub added_files: String,
-    pub modified_files: String,
-    pub deleted_files: String,
+    pub new_files: usize,
+    pub added_files: usize,
+    pub modified_files: usize,
+    pub deleted_files: usize,
     pub verbose_info: String,
 }
 
@@ -202,35 +202,38 @@ fn ui(f: &mut Frame, app: &App, cols: usize, visible_rows: usize) {
 }
 
 fn render_repo_widget(f: &mut Frame, area: Rect, repo: &RepoInfo, simple: bool) {
-    let content = if simple {
-        vec![
-            Line::from(vec![
-                Span::styled(&repo.name, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from(vec![
-                Span::styled(format!("[{}]", &repo.branch), Style::default().fg(Color::Green)),
-            ]),
+    let title = Line::from(vec![
+        Span::styled(&repo.name, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+    ]);
+    let branch = Line::from(vec![
+        Span::styled(format!("[{}]", &repo.branch), Style::default().fg(Color::Green)),
+    ]);
+    let changes = |repo: &RepoInfo| -> Line {
+        if repo.new_files !=0 || repo.added_files !=0 || repo.modified_files !=0 || repo.deleted_files !=0 {
             Line::from(vec![
                 Span::styled(format!("?{} ", &repo.new_files), Style::default().fg(Color::Blue)),
                 Span::styled(format!("+{} ", &repo.added_files), Style::default().fg(Color::Green)),
                 Span::styled(format!("~{} ", &repo.modified_files), Style::default().fg(Color::Yellow)),
                 Span::styled(format!("-{}", &repo.deleted_files), Style::default().fg(Color::Red)),
-            ]),
+            ])
+        } else {
+            Line::from(
+                Span::styled("Nothing new here!", Style::default().fg(Color::LightCyan).add_modifier(Modifier::ITALIC))
+            ) 
+        }
+    };
+
+    let content = if simple {
+        vec![
+            title,
+            branch,
+            changes(repo),
         ]
     } else {
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(&repo.name, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from(vec![
-                Span::styled(format!("[{}]", &repo.branch), Style::default().fg(Color::Green)),
-            ]),
-            Line::from(vec![
-                Span::styled(format!("?{} ", &repo.new_files), Style::default().fg(Color::Blue)),
-                Span::styled(format!("+{} ", &repo.added_files), Style::default().fg(Color::Green)),
-                Span::styled(format!("~{} ", &repo.modified_files), Style::default().fg(Color::Yellow)),
-                Span::styled(format!("-{}", &repo.deleted_files), Style::default().fg(Color::Red)),
-            ]),
+            title,
+            branch,
+            changes(repo),
         ];
         
         // Add verbose info lines

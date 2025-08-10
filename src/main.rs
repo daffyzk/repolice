@@ -203,8 +203,8 @@ fn get_files_list(text: &String, re: Regex) -> String{
     strang
 }
 
-fn count_matches(text: &String, sub_string: &str) -> String{
-    text.matches(&sub_string).count().to_string()
+fn count_matches(text: &String, sub_string: &str) -> usize {
+    text.matches(&sub_string).count()
 }
 
 
