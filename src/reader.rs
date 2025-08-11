@@ -100,22 +100,20 @@ impl Reader {
     }
 
     fn formatted_list(list: Vec<(String, String)>) -> String{
-        let mut final_list: String = "".to_string();
+        let mut final_list: String = String::new();
         let mut not_list: Vec<String> = vec![];
         for item in list {
-            let i_s = item.1.len().to_string().parse::<i32>().unwrap();
-            if i_s > 1 {
-                let title: String = format!("| {} Files:\n", item.0).to_string();
-                final_list.push_str(&title);
+            if (item.1.len() as i32) > 1 {
+                final_list.push_str(&format!("| {} Files:\n", item.0));
                 final_list.push_str(&item.1);
             }
             else {
                 not_list.push(item.0);
             }
         }
-        let mut final_no_element_list: String = "".to_string();
-        let e_s = not_list.len().to_string().parse::<i32>().unwrap();
-        match e_s {
+        let mut final_no_element_list: String = String::new();
+
+        match not_list.len() as i32 {
             1 => {
                 final_no_element_list = format!("{}", not_list.get(0).unwrap()).to_string()},
             2 => {
@@ -139,10 +137,9 @@ impl Reader {
     }
 
     fn get_files_list(text: &String, re: Regex) -> String{
-        let mut strang: String = "".to_string();
+        let mut strang: String = String::new();
         for cap in re.captures_iter(text){
-            let m: String = format!("| _ {}\n", &cap[1]);
-            strang.push_str(&m);
+            strang.push_str(&format!("| _ {}\n", &cap[1]));
         }
         
         strang
