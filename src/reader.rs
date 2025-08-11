@@ -4,25 +4,43 @@ use std::sync::Arc;
 use std::{env, thread};
 use regex::Regex;
 use to_vec::ToVec;
+use tokio::sync::mpsc;
+use tokio_stream::{wrappers::ReceiverStream, Stream};
+
+#[derive(Clone)]
+pub struct FileTracker {
+    pub status: String,
+    pub amount: usize,
+    pub files: Option<Vec<String>>
+}
+
+impl FileTracker {
+    fn new(status: &str, amount: usize, files: Option<Vec<String>>) -> Self {
+        Self {
+           status: status.to_string(), 
+           amount,
+           files
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct RepoInfo {
     pub name: String,
     pub branch: String,
-    pub new_files: usize,
-    pub added_files: usize,
-    pub modified_files: usize,
-    pub deleted_files: usize,
-    pub verbose_info: String,
+    pub new_files: FileTracker,
+    pub added_files: FileTracker,
+    pub modified_files: FileTracker,
+    pub deleted_files: FileTracker,
 }
 
 impl RepoInfo {
     pub fn has_changes(&self) -> bool {
-        self.new_files > 0 || self.added_files > 0 || self.modified_files > 0 || self.deleted_files > 0
+        self.new_files.amount > 0 || self.added_files.amount > 0 || self.modified_files.amount > 0 || self.deleted_files.amount > 0
     }
 
     pub fn total_changes(&self) -> usize {
-        self.new_files + self.added_files + self.modified_files + self.deleted_files
+        self.new_files.amount + self.added_files.amount + self.modified_files.amount + self.deleted_files.amount
     }
 }
 
@@ -41,8 +59,46 @@ impl Reader {
         repo_results.lines().map(String::from).to_vec()
     }
 
-    /// Collects info
-    pub fn collect_repo_info(repo_list: Vec<String>, verbose: bool, _depth: u8) -> Vec<RepoInfo> {
+    /// Creates a stream of RepoInfo as repositories.
+    /// Processes repos concurrently and send results as they are found
+    pub async fn stream_repos(path: PathBuf, verbose: bool, _depth: u8) -> impl Stream<Item = RepoInfo> {
+        let (tx, rx) = mpsc::channel(100);
+        
+        tokio::spawn(async move {
+            let repo_paths = Self::get_repos(path);
+            let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
+            
+            let mut handles = Vec::new();
+            
+            for path in repo_paths {
+                let tx_clone = tx.clone();
+                let re_clone = re.clone();
+                
+                let handle = tokio::spawn(async move {
+                    let repo_name = re_clone.find(&path).unwrap().as_str().to_string();
+                    
+                    let repo_info = tokio::task::spawn_blocking(move || { 
+                        Self::find_repo_info(&path, &repo_name, verbose)
+                    }).await;
+                    
+                    if let Ok(Some(repo_info)) = repo_info {
+                        let _ = tx_clone.send(repo_info).await;
+                    }
+                });
+                
+                handles.push(handle);
+            }
+            
+            for handle in handles {
+                let _ = handle.await;
+            }
+        });
+        
+        ReceiverStream::new(rx)
+    }
+
+    /// Collects info for all repos inside a dir tree
+    pub fn collect_repos(repo_list: Vec<String>, verbose: bool, _depth: u8) -> Vec<RepoInfo> {
         //name extraction for the repo will not work if it has a slash on it, but whatever.
         let re: Arc<Regex> = Arc::new(Regex::new(r"([^/]+$)").unwrap());
         let mut repos = Vec::new();
@@ -53,30 +109,12 @@ impl Reader {
                 let repo_name = reg.clone().find(&path).unwrap().as_str();
                 assert!(env::set_current_dir(&path).is_ok());
 
-                // Get git status --short for file status
-                let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
-                    .output().expect("Not a git Repository!");
-                let status: String = String::from_utf8_lossy(&output.stdout).to_string();
-
-                // Get current branch
-                let gb: Output = Command::new("git").args(["branch", "--show-current"]).stdout(Stdio::piped())
-                    .output().expect("Error!");
-                let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
-
-                RepoInfo {
-                    name: repo_name.to_string(),
-                    branch,
-                    new_files: Self::count_matches(&status, "?? "),
-                    added_files: Self::count_matches(&status, "A "),
-                    modified_files: Self::count_matches(&status, "M "),
-                    deleted_files: Self::count_matches(&status, "D "),
-                    verbose_info: if verbose{ Self::get_files_formatted(&status) } else { String::new() },
-                }
+                Self::find_repo_info(&path, &repo_name, verbose).unwrap()
             });
             repos.push(thread.join().unwrap());
         }
 
-        // Sort repositories: ones with changes first (by total changes descending), then clean ones alphabetically
+        // sort repositories, by total changes descending, with unchanged ones going last, sorted alphabetically
         repos.sort_by(|a, b| {
             match (a.has_changes(), b.has_changes()) {
                 (true, false) => std::cmp::Ordering::Less,                      // repos with changes come first
@@ -89,60 +127,63 @@ impl Reader {
         repos
     }
 
-    fn get_files_formatted(m: &String) -> String{
-        let mut file_list: Vec<(String, String)> = vec![];
-        file_list.push(("New".to_string(), Self::get_files_list(&m, Regex::new(r"\?\? (.*)\n").unwrap())));
-        file_list.push(("Added".to_string(), Self::get_files_list(&m, Regex::new(r"A (.*)\n").unwrap())));
-        file_list.push(("Modified".to_string(), Self::get_files_list(&m, Regex::new(r"M (.*)\n").unwrap())));
-        file_list.push(("Deleted".to_string(), Self::get_files_list(&m, Regex::new(r"D (.*)\n").unwrap())));
+    fn find_repo_info(path: &str, repo_name: &str, verbose: bool) -> Option<RepoInfo> {
+       if env::set_current_dir(path).is_err() {
+            return None;
+        }
+
+        let output = Command::new("git")
+            .args(["status", "--short"])
+            .stdout(Stdio::piped())
+            .output()
+            .ok()?;
+        let status = String::from_utf8_lossy(&output.stdout).to_string();
+
+        let gb = Command::new("git")
+            .args(["branch", "--show-current"])
+            .stdout(Stdio::piped())
+            .output()
+            .ok()?;
+        let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
         
-        Self::formatted_list(file_list)
-    }
+        if verbose {
+            Some(RepoInfo {
+                name: repo_name.to_string(),
+                branch,
+                new_files: FileTracker::new(
+                    "New", Self::count_matches(&status, "?? "), 
+                    Some(Self::get_filename_list(&status, Regex::new(r"\?\? (.*)\n").unwrap()))),
+                added_files: FileTracker::new(
+                    "Added", Self::count_matches(&status, "A "),
+                    Some(Self::get_filename_list(&status, Regex::new(r"A (.*)\n").unwrap()))
+                ),
+                modified_files: FileTracker::new(
+                    "Modified", Self::count_matches(&status, "M "),
+                    Some(Self::get_filename_list(&status, Regex::new(r"M (.*)\n").unwrap()))
+                ),
+                deleted_files:  FileTracker::new(
+                    "Deleted", Self::count_matches(&status, "D "),
+                    Some(Self::get_filename_list(&status, Regex::new(r"D (.*)\n").unwrap()))
+                ),
+            })
+        } else {
+            Some(RepoInfo {
+                name: repo_name.to_string(),
+                branch,
+                new_files:      FileTracker::new("??", Self::count_matches(&status, "?? "), None),
+                added_files:    FileTracker::new("A",  Self::count_matches(&status, "A "), None),
+                modified_files: FileTracker::new("M",  Self::count_matches(&status, "M "), None),
+                deleted_files:  FileTracker::new("D",  Self::count_matches(&status, "D "), None),
+            })
+        }
+    } 
 
-    fn formatted_list(list: Vec<(String, String)>) -> String{
-        let mut final_list: String = String::new();
-        let mut not_list: Vec<String> = vec![];
-        for item in list {
-            if (item.1.len() as i32) > 1 {
-                final_list.push_str(&format!("| {} Files:\n", item.0));
-                final_list.push_str(&item.1);
-            }
-            else {
-                not_list.push(item.0);
-            }
-        }
-        let mut final_no_element_list: String = String::new();
-
-        match not_list.len() as i32 {
-            1 => {
-                final_no_element_list = format!("{}", not_list.get(0).unwrap()).to_string()},
-            2 => {
-                final_no_element_list = format!("{} or {}", not_list.get(0).unwrap(), 
-                not_list.get(1).unwrap()).to_string()},
-            3 => {
-                final_no_element_list = format!("{}, {} or {}", not_list.get(0).unwrap(),
-                not_list.get(1).unwrap(), not_list.get(2).unwrap()).to_string()},
-            4 => {
-                final_no_element_list = format!("{}, {}, {} or {}", not_list.get(0).unwrap(), 
-                not_list.get(1).unwrap(), not_list.get(2).unwrap(), 
-                not_list.get(3).unwrap()).to_string()},
-            _ => {}
-        }
-        if final_no_element_list.is_empty(){
-            return final_list;
-        }
-        else {
-            return format!("| No {} Files.\n{}", final_no_element_list, final_list).to_string();
-        }
-    }
-
-    fn get_files_list(text: &String, re: Regex) -> String{
-        let mut strang: String = String::new();
+    fn get_filename_list(text: &str, re: Regex) -> Vec<String> {
+        let mut files: Vec<String> = vec![];
         for cap in re.captures_iter(text){
-            strang.push_str(&format!("| _ {}\n", &cap[1]));
+            files.push(cap[1].to_string());
         }
-        
-        strang
+        files 
     }
 
     fn count_matches(text: &String, sub_string: &str) -> usize {
@@ -150,9 +191,4 @@ impl Reader {
     }
 
 }
-
-
-
-
-
 

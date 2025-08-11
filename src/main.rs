@@ -1,6 +1,6 @@
 use std::env;
 use std::path::PathBuf;
-use printer::print_repos;
+use printer::Printer;
 use reader::Reader;
 use reader::RepoInfo;
 use clap::Parser;
@@ -34,7 +34,8 @@ struct Args {
 
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     
     let mut exec_path : PathBuf = env::current_dir().unwrap();  // cwd by default
@@ -56,16 +57,17 @@ fn main() {
     if args.fetch {
         println!("fetch = {}", exec_fetch)
     }
-    let repos: Vec<RepoInfo> = Reader::collect_repo_info(Reader::get_repos(exec_path.clone()), exec_verbose, exec_depth);
-    
     if exec_no_tui {
-        print_repos(repos, exec_verbose);
+        let repos: Vec<RepoInfo> = Reader::collect_repos(Reader::get_repos(exec_path.clone()), exec_verbose, exec_depth);
+        Printer::print_repos(repos, exec_verbose);
     } else {
-        match tui::run_tui_with_repos(&repos, exec_verbose) {
+        let repo_stream = Reader::stream_repos(exec_path.clone(), exec_verbose, exec_depth).await;
+        match tui::run_streaming_tui(repo_stream, exec_verbose).await {
             Ok(_) => {},
             Err(_) => {
                 println!("TUI failed, falling back to printed output...");
-                print_repos(repos, exec_verbose);
+                let repos: Vec<RepoInfo> = Reader::collect_repos(Reader::get_repos(exec_path), exec_verbose, exec_depth);
+                Printer::print_repos(repos, exec_verbose);
             }
         }
     }
