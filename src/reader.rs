@@ -48,12 +48,10 @@ impl Reader {
         let mut repos = Vec::new();
 
         for path in repo_list {
-            let new_path = path.clone();
-            let new_re = re.clone();
-
-            let thread = thread::spawn(move || {
-                let repo_name: String = new_re.find(new_path.clone().as_str()).unwrap().as_str().to_string();
-                assert!(env::set_current_dir(new_path.clone().as_str()).is_ok());
+            let reg = re.clone(); // new ref
+            let thread = thread::spawn( move || {
+                let repo_name = reg.clone().find(&path).unwrap().as_str();
+                assert!(env::set_current_dir(&path).is_ok());
 
                 // Get git status --short for file status
                 let output: Output = Command::new("git").args(["status", "--short"]).stdout(Stdio::piped())
@@ -65,9 +63,8 @@ impl Reader {
                     .output().expect("Error!");
                 let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
 
-
                 RepoInfo {
-                    name: repo_name,
+                    name: repo_name.to_string(),
                     branch,
                     new_files: Self::count_matches(&status, "?? "),
                     added_files: Self::count_matches(&status, "A "),
