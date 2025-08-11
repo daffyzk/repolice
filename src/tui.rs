@@ -82,31 +82,6 @@ impl App {
     }
 }
 
-pub fn run_tui_with_repos(repos: &Vec<RepoInfo>, simple: bool) -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let app = App::new(repos, simple);
-    let res = run_app_loop(&mut terminal, app);
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{err:?}");
-    }
-
-    Ok(())
-}
-
 pub async fn run_streaming_tui<S>(repo_stream: S, simple: bool) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     S: Stream<Item = RepoInfo> + Unpin,
@@ -203,40 +178,17 @@ where
     }
 }
 
-fn run_app_loop<B: Backend>(
-    terminal: &mut Terminal<B>,
-    mut app: App,
-) -> io::Result<()> {
-    loop {
-        let size = terminal.size()?;
-        let cols = 3;
-        let available_height = size.height.saturating_sub(6);
-        let visible_rows = (available_height / 6).max(1) as usize;
-        
-        terminal.draw(|f| ui(f, &app, cols, visible_rows))?;
-
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => return Ok(()),
-                KeyCode::Down => app.scroll_down(cols, visible_rows),
-                KeyCode::Up => app.scroll_up(),
-                _ => {}
-            }
-        }
-    }
-}
-
 fn ui(f: &mut Frame, app: &App, cols: usize, visible_rows: usize) {
     let size = f.area();
 
-    // Create main layout with title and status
+    // create main layout with title and status
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(1)].as_ref())
         .split(size);
 
-    // Title with scroll status and loading indicator
+    // title with scroll status and loading indicator
     let total_rows = (app.repos.len() + cols - 1) / cols;
     let title_text = if app.loading {
         format!("Repolice - Loading repositories... ({} found)", app.total_found)
@@ -254,7 +206,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, visible_rows: usize) {
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
-    // Create grid layout for visible repos only
+    // create grid layout for visible repos only
     if !app.repos.is_empty() {
         let start_repo = app.scroll_offset * cols;
         let end_repo = (start_repo + (visible_rows * cols)).min(app.repos.len());

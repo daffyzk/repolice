@@ -151,19 +151,20 @@ impl Reader {
                 name: repo_name.to_string(),
                 branch,
                 new_files: FileTracker::new(
-                    "New", Self::count_matches(&status, "?? "), 
-                    Some(Self::get_filename_list(&status, Regex::new(r"\?\? (.*)\n").unwrap()))),
+                    "New", Self::count_matches(&status, "?? "),
+                    Self::get_filename_list(&status, Regex::new(r"\?\? (.*)\n").unwrap())
+                ),
                 added_files: FileTracker::new(
                     "Added", Self::count_matches(&status, "A "),
-                    Some(Self::get_filename_list(&status, Regex::new(r"A (.*)\n").unwrap()))
+                    Self::get_filename_list(&status, Regex::new(r"A (.*)\n").unwrap())
                 ),
                 modified_files: FileTracker::new(
                     "Modified", Self::count_matches(&status, "M "),
-                    Some(Self::get_filename_list(&status, Regex::new(r"M (.*)\n").unwrap()))
+                    Self::get_filename_list(&status, Regex::new(r"M (.*)\n").unwrap())
                 ),
                 deleted_files:  FileTracker::new(
                     "Deleted", Self::count_matches(&status, "D "),
-                    Some(Self::get_filename_list(&status, Regex::new(r"D (.*)\n").unwrap()))
+                    Self::get_filename_list(&status, Regex::new(r"D (.*)\n").unwrap())
                 ),
             })
         } else {
@@ -178,12 +179,15 @@ impl Reader {
         }
     } 
 
-    fn get_filename_list(text: &str, re: Regex) -> Vec<String> {
+    fn get_filename_list(text: &str, re: Regex) -> Option<Vec<String>> {
         let mut files: Vec<String> = vec![];
         for cap in re.captures_iter(text){
             files.push(cap[1].to_string());
         }
-        files 
+        match files.len() {
+            0usize => None,
+            _ => Some(files)
+        }
     }
 
     fn count_matches(text: &String, sub_string: &str) -> usize {

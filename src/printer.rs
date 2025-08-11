@@ -6,7 +6,7 @@ pub struct Printer {}
 impl Printer {
 
     pub fn print_repos(repos: Vec<RepoInfo>, verbose: bool) {
-        let unchanged: Vec<String> = vec![];
+        let mut unchanged: Vec<String> = vec![];
         for repo in repos {
             if repo.has_changes() {
                 if verbose {
@@ -20,7 +20,14 @@ impl Printer {
                         repo.modified_files.amount, 
                         repo.deleted_files.amount);
                 } 
+            } else {
+                unchanged.push(repo.name);
             }
+        }
+        if unchanged.len() >= 1usize {
+            let joined: String = unchanged.iter().map(|s| format!(", {}", s)).collect();
+            let joined = joined.trim_start_matches(", ").to_string();
+            println!("Unchanged repos: {}", joined)
         }
     }
 
