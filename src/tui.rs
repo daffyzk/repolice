@@ -21,7 +21,7 @@ use futures::stream::Stream;
 
 pub struct App {
     pub repos: Vec<RepoInfo>,
-    pub simple: bool,
+    pub verbose: bool,
     pub scroll_offset: usize,
     pub loading: bool,
     pub total_found: usize,
@@ -48,23 +48,13 @@ impl App {
             }
         });
     }
-    pub fn new_streaming(simple: bool) -> App {
+    pub fn new(verbose: bool) -> App {
         App { 
             repos: Vec::new(),
-            simple, 
+            verbose, 
             scroll_offset: 0,
             loading: true,
             total_found: 0,
-        }
-    }
-
-    pub fn new(repos: &Vec<RepoInfo>, simple: bool) -> App {
-        App { 
-            repos: repos.clone(),               // cloning here for the memes 
-            simple, 
-            scroll_offset: 0,
-            loading: false,
-            total_found: repos.len(),
         }
     }
 
@@ -82,7 +72,7 @@ impl App {
     }
 }
 
-pub async fn run_streaming_tui<S>(repo_stream: S, simple: bool) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+pub async fn run_streaming_tui<S>(repo_stream: S, verbose: bool) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     S: Stream<Item = RepoInfo> + Unpin,
 {
@@ -92,7 +82,7 @@ where
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new_streaming(simple);
+    let app = App::new(verbose);
     let res = run_streaming_app_loop(&mut terminal, app, repo_stream).await;
 
     disable_raw_mode()?;
@@ -234,7 +224,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, visible_rows: usize) {
                     let repo_idx = row_idx * cols + col_idx;
                     if repo_idx < visible_repos.len() {
                         let repo = &visible_repos[repo_idx];
-                        render_repo_widget(f, col_chunks[col_idx], repo, app.simple);
+                        render_repo_widget(f, col_chunks[col_idx], repo, app.verbose);
                     }
                 }
             }
