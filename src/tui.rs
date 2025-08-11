@@ -1,3 +1,5 @@
+use crate::reader::RepoInfo;
+
 use std::io;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -13,16 +15,6 @@ use ratatui::{
     Frame, Terminal,
 };
 
-#[derive(Clone)]
-pub struct RepoInfo {
-    pub name: String,
-    pub branch: String,
-    pub new_files: usize,
-    pub added_files: usize,
-    pub modified_files: usize,
-    pub deleted_files: usize,
-    pub verbose_info: String,
-}
 
 pub struct App {
     pub repos: Vec<RepoInfo>,
@@ -31,8 +23,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(repos: Vec<RepoInfo>, simple: bool) -> App {
-        App { repos, simple, scroll_offset: 0 }
+    pub fn new(repos: &Vec<RepoInfo>, simple: bool) -> App {
+        App { 
+            repos: repos.clone(),               // cloning here for the memes 
+            simple, scroll_offset: 0 }
     }
 
     pub fn scroll_down(&mut self, cols: usize, visible_rows: usize) {
@@ -49,33 +43,7 @@ impl App {
     }
 }
 
-pub fn run_app() -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let repos = vec![]; // This will be populated from main
-    let app = App::new(repos, true);
-    let res = run_app_loop(&mut terminal, app);
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{err:?}");
-    }
-
-    Ok(())
-}
-
-pub fn run_tui_with_repos(repos: Vec<RepoInfo>, simple: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_tui_with_repos(repos: &Vec<RepoInfo>, simple: bool) -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
