@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::{Stdio, Command, Output};
 use std::sync::Arc;
-use std::{env, thread};
+use std::thread;
 use regex::Regex;
 use to_vec::ToVec;
 use tokio::sync::mpsc;
@@ -107,7 +107,6 @@ impl Reader {
             let reg = re.clone(); // new ref
             let thread = thread::spawn( move || {
                 let repo_name = reg.clone().find(&path).unwrap().as_str();
-                assert!(env::set_current_dir(&path).is_ok());
 
                 Self::find_repo_info(&path, &repo_name, verbose).unwrap()
             });
@@ -128,19 +127,15 @@ impl Reader {
     }
 
     fn find_repo_info(path: &str, repo_name: &str, verbose: bool) -> Option<RepoInfo> {
-       if env::set_current_dir(path).is_err() {
-            return None;
-        }
-
         let output = Command::new("git")
-            .args(["status", "--short"])
+            .args(["-C", path, "status", "--short"])
             .stdout(Stdio::piped())
             .output()
             .ok()?;
         let status = String::from_utf8_lossy(&output.stdout).to_string();
 
         let gb = Command::new("git")
-            .args(["branch", "--show-current"])
+            .args(["-C", path, "branch", "--show-current"])
             .stdout(Stdio::piped())
             .output()
             .ok()?;
