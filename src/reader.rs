@@ -6,6 +6,7 @@ use regex::Regex;
 use to_vec::ToVec;
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, Stream};
+use gix;
 
 #[derive(Clone)]
 pub struct FileTracker {
@@ -127,67 +128,75 @@ impl Reader {
     }
 
     fn find_repo_info(path: &str, repo_name: &str, verbose: bool) -> Option<RepoInfo> {
-        let output = Command::new("git")
-            .args(["-C", path, "status", "--short"])
-            .stdout(Stdio::piped())
-            .output()
-            .ok()?;
-        let status = String::from_utf8_lossy(&output.stdout).to_string();
-
-        let gb = Command::new("git")
-            .args(["-C", path, "branch", "--show-current"])
-            .stdout(Stdio::piped())
-            .output()
-            .ok()?;
-        let branch = String::from_utf8_lossy(&gb.stdout).to_string().replace("\n", "");
+        let repo = gix::open(path).ok()?;
         
+        let branch = match repo.head() {
+            Ok(head) => {
+                match head.referent_name() {
+                    Some(name) => {
+                        let full_name = name.as_bstr().to_string();
+                        full_name.strip_prefix("refs/heads/").unwrap_or(&full_name).to_string()
+                    }
+                    None => "HEAD".to_string(),
+                }
+            }
+            _ => "HEAD".to_string(),
+        };
+
+        let mut new_files = Vec::new();
+        let mut added_files = Vec::new();
+        let mut modified_files = Vec::new();
+        let mut deleted_files = Vec::new();
+
+        // Use simple dirty check and parse output manually to match git status --short
+        if let Ok(is_dirty) = repo.is_dirty() {
+            if is_dirty {
+                // Fallback to git command for now to maintain compatibility
+                let output = std::process::Command::new("git")
+                    .args(["-C", path, "status", "--porcelain"])
+                    .output();
+                
+                if let Ok(output) = output {
+                    let status = String::from_utf8_lossy(&output.stdout);
+                    for line in status.lines() {
+                        if line.len() >= 3 {
+                            let status_code = &line[..2];
+                            let file_path = &line[3..];
+                            
+                            match status_code {
+                                "??" => new_files.push(file_path.to_string()),
+                                "A " | "AM" => added_files.push(file_path.to_string()),
+                                " M" | "MM" | "M " => modified_files.push(file_path.to_string()),
+                                " D" | "D " => deleted_files.push(file_path.to_string()),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if verbose {
             Some(RepoInfo {
                 name: repo_name.to_string(),
                 branch,
-                new_files: FileTracker::new(
-                    "New", Self::count_matches(&status, "?? "),
-                    Self::get_filename_list(&status, Regex::new(r"\?\? (.*)\n").unwrap())
-                ),
-                added_files: FileTracker::new(
-                    "Added", Self::count_matches(&status, "A "),
-                    Self::get_filename_list(&status, Regex::new(r"A (.*)\n").unwrap())
-                ),
-                modified_files: FileTracker::new(
-                    "Modified", Self::count_matches(&status, "M "),
-                    Self::get_filename_list(&status, Regex::new(r"M (.*)\n").unwrap())
-                ),
-                deleted_files:  FileTracker::new(
-                    "Deleted", Self::count_matches(&status, "D "),
-                    Self::get_filename_list(&status, Regex::new(r"D (.*)\n").unwrap())
-                ),
+                new_files: FileTracker::new("New", new_files.len(), Some(new_files)),
+                added_files: FileTracker::new("Added", added_files.len(), Some(added_files)),
+                modified_files: FileTracker::new("Modified", modified_files.len(), Some(modified_files)),
+                deleted_files: FileTracker::new("Deleted", deleted_files.len(), Some(deleted_files)),
             })
         } else {
             Some(RepoInfo {
                 name: repo_name.to_string(),
                 branch,
-                new_files:      FileTracker::new("??", Self::count_matches(&status, "?? "), None),
-                added_files:    FileTracker::new("A",  Self::count_matches(&status, "A "), None),
-                modified_files: FileTracker::new("M",  Self::count_matches(&status, "M "), None),
-                deleted_files:  FileTracker::new("D",  Self::count_matches(&status, "D "), None),
+                new_files: FileTracker::new("??", new_files.len(), None),
+                added_files: FileTracker::new("A", added_files.len(), None),
+                modified_files: FileTracker::new("M", modified_files.len(), None),
+                deleted_files: FileTracker::new("D", deleted_files.len(), None),
             })
         }
     } 
 
-    fn get_filename_list(text: &str, re: Regex) -> Option<Vec<String>> {
-        let mut files: Vec<String> = vec![];
-        for cap in re.captures_iter(text){
-            files.push(cap[1].to_string());
-        }
-        match files.len() {
-            0usize => None,
-            _ => Some(files)
-        }
-    }
-
-    fn count_matches(text: &String, sub_string: &str) -> usize {
-        text.matches(&sub_string).count()
-    }
 
 }
 
