@@ -21,6 +21,8 @@ use futures::stream::Stream;
 
 pub struct App {
     pub repos: Vec<RepoInfo>,
+    pub repos_with_changes: Vec<RepoInfo>,
+    pub clean_repos: Vec<RepoInfo>,
     pub verbose: bool,
     pub scroll_offset: usize,
     pub loading: bool,
@@ -30,13 +32,27 @@ pub struct App {
 
 impl App {
     pub fn add_repo(&mut self, repo: RepoInfo) {
-        self.repos.push(repo);
+        self.repos.push(repo.clone());
         self.sort_repos();
+        self.update_repo_separation();
         self.total_found = self.repos.len();
     }
 
     pub fn set_loading_complete(&mut self) {
         self.loading = false;
+    }
+
+    fn update_repo_separation(&mut self) {
+        self.repos_with_changes.clear();
+        self.clean_repos.clear();
+        
+        for repo in &self.repos {
+            if repo.has_changes() {
+                self.repos_with_changes.push(repo.clone());
+            } else {
+                self.clean_repos.push(repo.clone());
+            }
+        }
     }
 
     fn sort_repos(&mut self) {
@@ -52,6 +68,8 @@ impl App {
     pub fn new(verbose: bool) -> App {
         App { 
             repos: Vec::new(),
+            repos_with_changes: Vec::new(),
+            clean_repos: Vec::new(),
             verbose, 
             scroll_offset: 0,
             loading: true,
@@ -61,8 +79,7 @@ impl App {
     }
 
     pub fn scroll_down(&mut self, cols: usize, available_height: usize) {
-        let repos_with_changes: Vec<_> = self.repos.iter().filter(|r| r.has_changes()).collect();
-        let total_rows = (repos_with_changes.len() + cols - 1) / cols;
+        let total_rows = (self.repos_with_changes.len() + cols - 1) / cols;
         
         let estimated_visible_rows = (available_height / 6).max(1); // estimate
         
@@ -84,8 +101,7 @@ impl App {
     }
 
     pub fn scroll_clean_right(&mut self, visible_clean_repos: usize) {
-        let clean_repos: Vec<_> = self.repos.iter().filter(|r| !r.has_changes()).collect();
-        if self.clean_scroll_offset + visible_clean_repos < clean_repos.len() {
+        if self.clean_scroll_offset + visible_clean_repos < self.clean_repos.len() {
             self.clean_scroll_offset += 1;
         }
     }
@@ -193,9 +209,9 @@ where
 fn ui(f: &mut Frame, app: &App, cols: usize, available_height: u16) {
     let size = f.area();
 
-    // Separate repos with changes from clean repos
-    let repos_with_changes: Vec<_> = app.repos.iter().filter(|r| r.has_changes()).collect();
-    let clean_repos: Vec<_> = app.repos.iter().filter(|r| !r.has_changes()).collect();
+    // Use cached repo separation
+    let repos_with_changes = &app.repos_with_changes;
+    let clean_repos = &app.clean_repos;
 
     // create main layout with title, main content, clean repos footer, and instructions
     let constraints = if clean_repos.is_empty() {
@@ -230,7 +246,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, available_height: u16) {
 
     // create grid layout for visible repos with changes only
     if !repos_with_changes.is_empty() {
-        // Calculate how many repos can fit in the available height
+        // calculate how many repos can fit in the available height
         let mut current_height = 0u16;
         let mut visible_repos = Vec::new();
         let mut row_idx = app.scroll_offset;
@@ -242,7 +258,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, available_height: u16) {
             for col_idx in 0..cols {
                 let repo_idx = row_idx * cols + col_idx;
                 if repo_idx < repos_with_changes.len() {
-                    let repo = repos_with_changes[repo_idx];
+                    let repo = &repos_with_changes[repo_idx];
                     let repo_height = calculate_repo_height(repo, app.verbose);
                     max_height_in_row = max_height_in_row.max(repo_height);
                     repos_in_row.push(repo);
@@ -264,7 +280,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, available_height: u16) {
             // calculate dynamic heights for each row based on content
             let mut row_heights = Vec::new();
             for row_idx in 0..actual_visible_rows {
-                let mut max_height_in_row = 3; // Minimum height (name + branch + border)
+                let mut max_height_in_row = 3; // minimum height (name + branch + border)
                 
                 for col_idx in 0..cols {
                     let repo_idx = row_idx * cols + col_idx;
@@ -313,7 +329,7 @@ fn ui(f: &mut Frame, app: &App, cols: usize, available_height: u16) {
 
     // only render clean repos footer if there are any
     if !clean_repos.is_empty() {
-        render_clean_repos_footer(f, chunks[2], &clean_repos, app.clean_scroll_offset, size.width);
+        render_clean_repos_footer(f, chunks[2], clean_repos, app.clean_scroll_offset, size.width);
     }
 
     let instruction_text = if clean_repos.is_empty() {
@@ -357,8 +373,8 @@ fn calculate_repo_height(repo: &RepoInfo, verbose: bool) -> u16 {
     height
 }
 
-fn render_clean_repos_footer(f: &mut Frame, area: Rect, clean_repos: &[&RepoInfo], scroll_offset: usize, terminal_width: u16) {
-    let repo_width = 12; // Each clean repo takes 12 characters
+fn render_clean_repos_footer(f: &mut Frame, area: Rect, clean_repos: &[RepoInfo], scroll_offset: usize, terminal_width: u16) {
+    let repo_width = 12; // each clean repo takes 12 characters
     let visible_count = (terminal_width / repo_width).max(1) as usize;
     let start_idx = scroll_offset;
     let end_idx = (start_idx + visible_count).min(clean_repos.len());
